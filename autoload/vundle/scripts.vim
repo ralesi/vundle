@@ -23,7 +23,7 @@ func! vundle#scripts#complete(a,c,d)
 endf
 
 func! vundle#scripts#unloaded(a,c,d)
-   return join(map(vundle#installer#unloaded(), ' printf("'."'%s'".'", v:val) '),"\n")
+   return join(map(vundle#installer#unloaded(), ' printf("%s", v:val) '),"\n")
 endf
 
 func! s:view_log()
