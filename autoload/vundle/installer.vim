@@ -1,4 +1,5 @@
 func! vundle#installer#new(bang, ...) abort
+
   let bundles = (a:1 == '') ?
         \ g:bundles :
         \ map(copy(a:000), 'vundle#config#bundle(v:val, {})')
@@ -11,26 +12,46 @@ func! vundle#installer#new(bang, ...) abort
   call vundle#config#require(bundles)
 endf
 
-func! vundle#installer#load(...)
+func! vundle#installer#load(...) 
   " echom join(a:000,'')
+  if type(a:000) == type ([]) && a:0 == 1
+      let new_bundle = split(a:000[0],',')
+  else
+      let new_bundle = copy(a:000)
+  endif
+
+
   let bundles = (a:0 == '') ?
         \ g:bundles :
-        \ map(copy(a:000), 'vundle#config#bundle(v:val, {})')
-  call vundle#config#require(bundles)
+        \ map(new_bundle, 'vundle#config#bundle(v:val, {})')
+
+  " echo bundles
+  " let names = map(copy(bundles), 'v:val.name_spec'))
 
   " check for parameter function
   for v in bundles
       :call s:settings(v.name)
   endfor
+
+  call vundle#config#require(bundles)
+
   " apply newly loaded ftbundles to currently open buffers
   " echom join(bundles,'')
   doautoall BufRead
 endf
 
 func! s:settings(name)
-      exec "echom 'Param_".a:name."'"
-  if exists("*Params_".a:name)
-      exec "call Param_".a:name
+  let name = substitute(a:name,'-\|\.','_','g')
+  let name = tolower(name)
+
+  try
+    call package#load()
+  catch
+  endtry
+
+  if exists("*package#".name)
+    " exec "echom 'package#".name."'"
+    exec "call package#".name."()"
   endif
 endfunc
 
@@ -104,6 +125,7 @@ func! s:sign(status)
 endf
 
 func! vundle#installer#install_and_require(bang, name) abort
+ " echom 'required'
   let result = vundle#installer#install(a:bang, a:name)
   let b = vundle#config#bundle(a:name, {})
   call vundle#installer#helptags([b])
@@ -114,7 +136,13 @@ endf
 func! vundle#installer#install(bang, name) abort
   if !isdirectory(g:bundle_dir) | call mkdir(g:bundle_dir, 'p') | endif
 
-  let b = vundle#config#init_bundle(a:name, {})
+  exec 'let current = filter(copy(g:bundles), "v:val.name_spec =~ '.a:name.'")'
+  if !empty(current)
+    let options = filter(copy(current[0]), 'v:key =~ "sync"') 
+  else
+    let options = {}
+  endif
+  let b = vundle#config#init_bundle(a:name, options)
 
   return s:sync(a:bang, b)
 endf
@@ -142,7 +170,7 @@ func! vundle#installer#list(bang) abort
   let bundles = vundle#scripts#bundle_names(map(copy(g:bundles), 'v:val.name_spec'))
   call vundle#scripts#view('list', ['" My Bundles'], bundles)
   redraw
-  echo len(g:bundles).' bundles configured'
+  " echo len(g:bundles).' bundles configured'
 endf
 
 func! vundle#installer#unloaded() abort
@@ -226,6 +254,12 @@ endf
 
 func! s:sync(bang, bundle) abort
 
+    " echom get(a:bundle,'sync')
+
+  if get(a:bundle,'sync','yes') == 'no'
+      return 'todate'
+  endif
+
   let types = {'.git' : 'git', '.hg' : 'hg', '.bzr' : 'bzr', '.svn': 'svn' }
   " not sure if necessary, will detect DVCS type from directory
   if empty(a:bundle.type)
@@ -267,16 +301,25 @@ func! s:sync(bang, bundle) abort
 
   if s:iswindows()
     let cmd = substitute(cmd, '^cd ','cd /d ','')  " add /d switch to change drives
-    let cmd = '"'.cmd.'"'                          " enclose in quotes
+    " let cmd = '"'.cmd.'"'                          " enclose in quotes
   endif
 
   let out = s:system(cmd)
+
+  let outlist = split(out,"\n",1)
+
   call s:log('')
   call s:log('Bundle '.a:bundle.name_spec)
   call s:log('$ '.cmd)
-  call s:log('> '.out)
 
-  if 0 != v:shell_error
+  for output in outlist
+    if match(output,'^You') != -1
+      let out = 0
+    endif
+    call s:log('> '.output)
+  endfor
+
+  if (0 != v:shell_error || [out] == [0])
     return 'error'
   end
 
@@ -288,11 +331,16 @@ func! s:sync(bang, bundle) abort
 endf
 
 func! s:system(cmd) abort
-  if exists("xolox#shell#execute")
-    return join(xolo#shell#execute(a:cmd,1),'\n')
-  else
-    return system(a:cmd)
-  endif
+    if exists("*xolox#shell#execute")
+        let res = xolox#shell#execute(a:cmd,1)
+        try
+            return join(res,"\n")
+        catch
+            return res
+        endtry
+    else
+        return system(a:cmd)
+    endif
 endf
 
 func! s:log(str) abort

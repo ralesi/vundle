@@ -13,6 +13,7 @@ func! vundle#config#init()
 endf
 
 func! vundle#config#require(bundles) abort
+  " echo a:bundles
   for b in a:bundles
     call s:rtp_add(b.rtpath)
     call s:rtp_add(g:bundle_dir)
@@ -27,17 +28,17 @@ func! vundle#config#init_bundle(name, opts)
   let opts = extend(s:parse_options(a:opts), s:parse_name(substitute(a:name,"['".'"]\+','','g')))
   let b = extend(opts, copy(s:bundle))
   let b.rtpath = s:rtpath(opts)
+  let b.sync = has_key(opts, 'sync') ? opts.sync : 'yes'
   return b
 endf
 
 func! s:parse_options(opts)
-  " TODO: improve this
-  if len(a:opts) != 1 | return {} | endif
-
-  if type(a:opts[0]) == type({})
+  if type(a:opts) == type({})
+    return a:opts
+  elseif type(a:opts) == type([]) && len(a:opts) == 1
     return a:opts[0]
-  else
-    return {'rev': a:opts[0]}
+  else 
+    return {} 
   endif
 endf
 
