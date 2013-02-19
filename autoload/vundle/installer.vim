@@ -30,7 +30,7 @@ func! vundle#installer#load(...)
 
   " check for parameter function
   for v in bundles
-      :call s:settings(v.name)
+      :call vundle#installer#settings(v.name)
   endfor
 
   call vundle#config#require(bundles)
@@ -40,19 +40,21 @@ func! vundle#installer#load(...)
   doautoall BufRead
 endf
 
-func! s:settings(name)
+func! vundle#installer#settings(name)
   let name = substitute(a:name,'-\|\.','_','g')
   let name = tolower(name)
 
-  try
-    call package#load()
-  catch
-  endtry
+  " try
+  "   call package#load()
+  " catch
+  " endtry
 
-  if exists("*package#".name)
-    " exec "echom 'package#".name."'"
-    exec "call package#".name."()"
+  if exists("*package#".name) && !exists("g:_".name."_loaded")
+      " exec "echom 'package#".name."'"
+      exec "call package#".name."()"
+      exec "let g:_".name."_loaded=1"
   endif
+  " endif
 endfunc
 
 func! s:process(bang, cmd)

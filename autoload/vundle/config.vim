@@ -3,6 +3,7 @@ func! vundle#config#bundle(arg, ...)
   call s:rtp_rm_a()
   call add(g:bundles, bundle)
   call s:rtp_add_a()
+  call vundle#installer#settings(bundle.name)
   return bundle
 endf
 
