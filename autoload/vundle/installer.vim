@@ -296,6 +296,7 @@ func! s:sync(bang, bundle) abort
     endif
   else
     " how did we get here?
+    echo type . " repository is not supported"
     return
   endif
 
@@ -331,8 +332,9 @@ func! s:sync(bang, bundle) abort
 endf
 
 func! s:system(cmd) abort
-    if exists("*xolox#shell#execute")
-        let res = xolox#shell#execute(a:cmd,1)
+    if exists("*xolox#misc#os#exec")
+        " echom a:cmd
+        let res = get(xolox#misc#os#exec({'command': a:cmd, 'check': 0}),'stdout','')
         try
             return join(res,"\n")
         catch

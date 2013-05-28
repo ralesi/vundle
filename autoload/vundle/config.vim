@@ -44,7 +44,7 @@ endf
 
 func! s:parse_name(arg)
 
-  let git_proto = exists('g:vundle_default_git_proto') ? g:vundle_default_git_proto : 'https'
+  let git_proto = exists('g:vundle_default_git_proto') ? g:vundle_default_git_proto : 'http'
 
   " default to git
   let type = 'git'
