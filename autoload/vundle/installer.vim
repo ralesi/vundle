@@ -11,6 +11,24 @@ func! vundle#installer#new(bang, ...) abort
   call vundle#config#require(bundles)
 endf
 
+" adhoc load of bundle 
+func! vundle#installer#load(...) 
+  " echom join(a:000,'')
+  if type(a:000) == type ([]) && a:0 == 1
+      let new_bundle = split(a:000[0],',')
+  else
+      let new_bundle = copy(a:000)
+  endif
+
+  let bundles = (a:0 == '') ?
+        \ g:bundles :
+        \ map(new_bundle, 'vundle#config#bundle(v:val, {})')
+
+  call vundle#config#require(bundles)
+
+  " apply newly loaded bundles to currently open buffers
+  doautoall BufRead
+endf
 
 func! s:process(bang, cmd)
   let msg = ''
@@ -135,20 +153,28 @@ func! vundle#installer#list(bang) abort
   echo len(g:bundles).' bundles configured'
 endf
 
-
-func! vundle#installer#clean(bang) abort
+func! vundle#installer#unloaded() abort
   let bundle_dirs = map(copy(g:bundles), 'v:val.path()') 
   let all_dirs = (v:version > 702 || (v:version == 702 && has("patch51")))
   \   ? split(globpath(g:bundle_dir, '*', 1), "\n")
   \   : split(globpath(g:bundle_dir, '*'), "\n")
   let x_dirs = filter(all_dirs, '0 > index(bundle_dirs, v:val)')
+  return map(copy(x_dirs), 'fnamemodify(v:val, ":t")')
+endfunc
 
-  if empty(x_dirs)
+func! vundle#installer#clean(bang, name) abort
+
+  let unloaded = vundle#installer#unloaded()
+
+  if empty(unloaded)
     let headers = ['" All clean!']
     let names = []
+  elseif a:name =~ join(unloaded,'\|')
+    let headers = ['" Removing bundle:']
+    let names = vundle#scripts#bundle_names([a:name])
   else
     let headers = ['" Removing bundles:']
-    let names = vundle#scripts#bundle_names(map(copy(x_dirs), 'fnamemodify(v:val, ":t")'))
+    let names = vundle#scripts#bundle_names(unloaded)
   end
 
   call vundle#scripts#view('clean', headers, names)
