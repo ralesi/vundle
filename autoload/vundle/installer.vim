@@ -118,7 +118,13 @@ endf
 func! vundle#installer#install(bang, name) abort
   if !isdirectory(g:bundle_dir) | call mkdir(g:bundle_dir, 'p') | endif
 
-  let b = vundle#config#init_bundle(a:name, {})
+  exec 'let current = filter(copy(g:bundles), "v:val.name_spec =~ '.a:name.'")'
+  if !empty(current)
+    let options = filter(copy(current[0]), 'v:key =~ "sync"') 
+  else
+    let options = {}
+  endif
+  let b = vundle#config#init_bundle(a:name, options)
 
   return s:sync(a:bang, b)
 endf
