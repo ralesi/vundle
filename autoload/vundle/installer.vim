@@ -258,19 +258,57 @@ func! s:helptags(rtp) abort
 endf
 
 func! s:sync(bang, bundle) abort
-  let git_dir = expand(a:bundle.path().'/.git/', 1)
-  if isdirectory(git_dir) || filereadable(expand(a:bundle.path().'/.git', 1))
-    if !(a:bang) | return 'todate' | endif
-    let cmd = 'cd '.shellescape(a:bundle.path()).' && git pull && git submodule update --init --recursive'
 
-    let cmd = g:shellesc_cd(cmd)
+  let vcs_types = {'.git' : 'git', '.hg' : 'hg', '.bzr' : 'bzr', '.svn': 'svn' }
 
-    let get_current_sha = 'cd '.shellescape(a:bundle.path()).' && git rev-parse HEAD'
-    let get_current_sha = g:shellesc_cd(get_current_sha)
-    let initial_sha = s:system(get_current_sha)[0:15]
+
+  " if type is not determined, detect DVCS type from directory
+  if empty(a:bundle.type)
+    for [k,t] in items(vcs_types)
+      let repo_dir = expand(a:bundle.path().'/.'.k.'/',1)
+      if isdirectory(repo_dir) | let type = t | break | endif
+    endfor
   else
-    let cmd = 'git clone --recursive '.shellescape(a:bundle.uri).' '.shellescape(a:bundle.path())
-    let initial_sha = ''
+    let type = a:bundle.type
+    let repo_dir = expand(a:bundle.path().'/.'.a:bundle.type.'/',1)
+  endif
+
+  let dir = shellescape(a:bundle.path())
+  let uri = shellescape(a:bundle.uri)
+
+  let vcs_update = {
+        \'git': 'cd '.dir.' && git pull && git submodule update --init --recursive',
+        \'hg':  'hg pull -u -R '.dir,
+        \'bzr': 'bzr pull -d '.dir,
+        \'svn': 'cd '.dir.' && svn update'}  
+
+  let vcs_sha = {
+        \'git': 'cd '.dir.' && git rev-parse HEAD',
+        \'hg': '',
+        \'bzr': '',
+        \'svn': ''}  
+
+  let vcs_checkout = {
+        \'git':  'git clone --recursive '.uri.' '.dir.'',
+        \'hg':   'hg clone '.uri.' '.dir.'',
+        \'bzr':  'bzr branch '.uri.' '.dir.'',
+        \'svn':  ''}
+
+  if type =~ '^\%(git\|hg\|bzr\|svn\)$'
+    " if folder already exists, just pull
+    if isdirectory(repo_dir) || filereadable(expand(a:bundle.path().'/.git', 1))
+      if !(a:bang) || get(a:bundle,'sync','yes') == 'no' | return 'todate' | endif
+
+      let cmd = g:shellesc_cd(vcs_update[type])
+      let initial_sha = s:system(vcs_sha[type])
+
+    else
+      let cmd = vcs_checkout[type]
+      let initial_sha = ''
+    endif
+  else
+    echo type . " repository is not supported"
+    return
   endif
 
   let out = s:system(cmd)
@@ -287,11 +325,12 @@ func! s:sync(bang, bundle) abort
     return 'new'
   endif
 
-  let updated_sha = s:system(get_current_sha)[0:15]
+  let updated_sha = s:system(vcs_sha[type])
 
   if initial_sha == updated_sha
     return 'todate'
-  endif
+  end
+
 
   call add(g:updated_bundles, [initial_sha, updated_sha, a:bundle])
   return 'updated'

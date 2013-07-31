@@ -49,8 +49,29 @@ func! s:parse_name(arg)
   let arg = a:arg
   let git_proto = exists('g:vundle_default_git_proto') ? g:vundle_default_git_proto : 'https'
 
-  if    arg =~? '^\s*\(gh\|github\):\S\+'
+  " default to git
+  let type = 'git'
+
+  " mercurial
+  if arg[:3] ==# 'bit:'
+      " bit:{N}/{repo}      {"type": "hg", "uri": "http://bitbucket.org/{Name}/{repo}}
+      let uri = 'https://bitbucket.org/'.arg[len('bit:'):]
+      let name = split(uri,'\/')[-1]
+      let type = 'hg'
+  elseif arg[:2]==#'hg:'
+      " hg:{uri}          {"type": "hg", "uri": {uri}}
+      let uri = arg[len('hg:'):]
+      let name = split(uri,'\/')[-1]
+      let type = 'hg'
+      " bazaar
+  elseif arg[:2]==#'lp:'
+      let uri = arg
+      let name = split (uri, ':')[-1]
+      let type = 'bzr'
+      " git
+  elseif arg =~? '^\s*\(gh\|github\):\S\+'
   \  || arg =~? '^[a-z0-9][a-z0-9-]*/[^/]\+$'
+      " github|gh:{N}/{Repo}  {"type": "git", "uri": "git://github.com/{N}/{Repo}"}
     let uri = git_proto.'://github.com/'.split(arg, ':')[-1]
     if uri !~? '\.git$'
       let uri .= '.git'
@@ -59,14 +80,15 @@ func! s:parse_name(arg)
   elseif arg =~? '^\s*\(git@\|git://\)\S\+' 
   \   || arg =~? '\(file\|https\?\)://'
   \   || arg =~? '\.git\s*$'
+      " git|https:{uri}          {"type": "git", "uri": {uri}}
     let uri = arg
     let name = split( substitute(uri,'/\?\.git\s*$','','i') ,'\/')[-1]
   else
     let name = arg
     let uri  = git_proto.'://github.com/vim-scripts/'.name.'.git'
   endif
-  return {'name': name, 'uri': uri, 'name_spec': arg }
-endf
+  return {'name': name, 'uri': uri, 'name_spec': arg, 'type':type }
+  endf
 
 func! s:rtp_rm_a()
   let paths = map(copy(g:bundles), 'v:val.rtpath')

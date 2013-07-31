@@ -42,12 +42,17 @@ func! s:create_changelog() abort
     let initial_sha = bundle_data[0]
     let updated_sha = bundle_data[1]
     let bundle      = bundle_data[2]
+    let type        = bundle.type
 
-    let cmd = 'cd '.shellescape(bundle.path()).
-          \              ' && git log --pretty=format:"%s   %an, %ar" --graph '.
-          \               initial_sha.'..'.updated_sha
 
-    let cmd = g:shellesc_cd(cmd)
+  let vcs_changelog = {
+        \'git': 'cd '.bundle.path().' && git log --pretty=format:"%s   %an, %ar" --graph '
+              \.initial_sha.'..'.updated_sha,
+        \'hg':  '',
+        \'bzr': '',
+        \'svn': ''}  
+
+    let cmd = g:shellesc_cd(vcs_changelog[type])
 
     let updates = system(cmd)
 
