@@ -1,5 +1,4 @@
 func! vundle#installer#new(bang, ...) abort
-
   let bundles = (a:1 == '') ?
         \ g:bundles :
         \ map(copy(a:000), 'vundle#config#bundle(v:val, {})')
@@ -12,6 +11,7 @@ func! vundle#installer#new(bang, ...) abort
   call vundle#config#require(bundles)
 endf
 
+" load package specific configs
 func! vundle#installer#load(...) 
   " echom join(a:000,'')
   if type(a:000) == type ([]) && a:0 == 1
@@ -67,6 +67,10 @@ func! s:process(bang, cmd)
       let msg = 'With errors; press l to view log'
     endif
 
+    if 'updated' == g:vundle_last_status && empty(msg)
+      let msg = 'Bundles updated; press u to view changelog'
+    endif
+
     " goto next one
     exec ':+1'
 
@@ -91,12 +95,16 @@ func! vundle#installer#run(func_name, name, ...) abort
 
   redraw
 
-  if 'updated' == status 
+  if 'new' == status
     echo n.' installed'
+  elseif 'updated' == status
+    echo n.' updated'
   elseif 'todate' == status
     echo n.' already installed'
   elseif 'deleted' == status
     echo n.' deleted'
+  elseif 'helptags' == status
+    echo n.' regenerated'
   elseif 'error' == status
     echohl Error
     echo 'Error processing '.n
@@ -120,7 +128,6 @@ func! s:sign(status)
 endf
 
 func! vundle#installer#install_and_require(bang, name) abort
- " echom 'required'
   let result = vundle#installer#install(a:bang, a:name)
   let b = vundle#config#bundle(a:name, {})
   call vundle#installer#helptags([b])
@@ -143,8 +150,11 @@ func! vundle#installer#install(bang, name) abort
 endf
 
 func! vundle#installer#docs() abort
-  call vundle#installer#helptags(g:bundles)
-  return 'updated'
+  let error_count = vundle#installer#helptags(g:bundles)
+  if error_count > 0
+      return 'error'
+  endif
+  return 'helptags'
 endf
 
 func! vundle#installer#helptags(bundles) abort
@@ -154,23 +164,26 @@ func! vundle#installer#helptags(bundles) abort
   call s:log('')
   call s:log('Helptags:')
 
-  call map(copy(help_dirs), 's:helptags(v:val)')
+  let statuses = map(copy(help_dirs), 's:helptags(v:val)')
+  let errors = filter(statuses, 'v:val == 0')
 
   call s:log('Helptags: '.len(help_dirs).' bundles processed')
 
-  return help_dirs
+  return len(errors)
 endf
 
 func! vundle#installer#list(bang) abort
   let bundles = vundle#scripts#bundle_names(map(copy(g:bundles), 'v:val.name_spec'))
   call vundle#scripts#view('list', ['" My Bundles'], bundles)
   redraw
-  " echo len(g:bundles).' bundles configured'
+  echo len(g:bundles).' bundles configured'
 endf
 
 func! vundle#installer#unloaded() abort
   let bundle_dirs = map(copy(g:bundles), 'v:val.path()') 
-  let all_dirs = v:version >= 702 ? split(globpath(g:bundle_dir, '*', 1), "\n") : split(globpath(g:bundle_dir, '*'), "\n")
+  let all_dirs = (v:version > 702 || (v:version == 702 && has("patch51")))
+  \   ? split(globpath(g:bundle_dir, '*', 1), "\n")
+  \   : split(globpath(g:bundle_dir, '*'), "\n")
   let x_dirs = filter(all_dirs, '0 > index(bundle_dirs, v:val)')
   return map(copy(x_dirs), 'fnamemodify(v:val, ":t")')
 endfunc
@@ -232,7 +245,7 @@ endf
 func! s:has_doc(rtp) abort
   return isdirectory(a:rtp.'/doc')
   \   && (!filereadable(a:rtp.'/doc/tags') || filewritable(a:rtp.'/doc/tags'))
-  \   && v:version >= 702
+  \   && (v:version > 702 || (v:version == 702 && has("patch51")))
   \     ? !(empty(glob(a:rtp.'/doc/*.txt', 1)) && empty(glob(a:rtp.'/doc/*.??x', 1)))
   \     : !(empty(glob(a:rtp.'/doc/*.txt')) && empty(glob(a:rtp.'/doc/*.??x')))
 endf
@@ -241,100 +254,115 @@ func! s:helptags(rtp) abort
   let doc_path = a:rtp.'/doc/'
   call s:log(':helptags '.doc_path)
   try
-    helptags `=doc_path`
+    execute 'helptags ' . doc_path
   catch
     call s:log("> Error running :helptags ".doc_path)
+    return 0
   endtry
+  return 1
 endf
 
 func! s:sync(bang, bundle) abort
 
-    " echom get(a:bundle,'sync')
+  let vcs_types = {'.git' : 'git', '.hg' : 'hg', '.bzr' : 'bzr', '.svn': 'svn' }
 
-  if get(a:bundle,'sync','yes') == 'no'
-      return 'todate'
-  endif
 
-  let types = {'.git' : 'git', '.hg' : 'hg', '.bzr' : 'bzr', '.svn': 'svn' }
-  " not sure if necessary, will detect DVCS type from directory
+  " if type is not determined, detect DVCS type from directory
   if empty(a:bundle.type)
-    for [k,t] in items(types)
-      let repo_dir = expand(a:bundle.path().'/.'.k.'/')
+    for [k,t] in items(vcs_types)
+      let repo_dir = expand(a:bundle.path().'/.'.k.'/',1)
       if isdirectory(repo_dir) | let type = t | break | endif
     endfor
   else
     let type = a:bundle.type
-    let repo_dir = expand(a:bundle.path().'/.'.a:bundle.type.'/')
+    let repo_dir = expand(a:bundle.path().'/.'.a:bundle.type.'/',1)
   endif
 
   let dir = shellescape(a:bundle.path())
+  let uri = shellescape(a:bundle.uri)
 
   let vcs_update = {
-        \'git': 'cd '.dir.' && git pull',
+        \'git': 'cd '.dir.' && git pull && git submodule update --init --recursive',
         \'hg':  'hg pull -u -R '.dir,
         \'bzr': 'bzr pull -d '.dir,
         \'svn': 'cd '.dir.' && svn update'}  
 
+  let vcs_sha = {
+        \'git': 'cd '.dir.' && git rev-parse HEAD',
+        \'hg': '',
+        \'bzr': '',
+        \'svn': ''}  
+
   let vcs_checkout = {
-        \'git':  'git clone '.a:bundle.uri.' '.dir.'',
-        \'hg':   'hg clone '.a:bundle.uri.' '.dir.'',
-        \'bzr':  'bzr branch '.a:bundle.uri.' '.dir.'',
+        \'git':  'git clone --recursive '.uri.' '.dir.'',
+        \'hg':   'hg clone '.uri.' '.dir.'',
+        \'bzr':  'bzr branch '.uri.' '.dir.'',
         \'svn':  ''}
-  
+
   if type =~ '^\%(git\|hg\|bzr\|svn\)$'
     " if folder already exists, just pull
-    if isdirectory(repo_dir)
-      if !(a:bang) | return 'todate' | endif
-      let cmd = vcs_update[type]
+    if isdirectory(repo_dir) || filereadable(expand(a:bundle.path().'/.git', 1))
+      if !(a:bang) || get(a:bundle,'sync','yes') == 'no' | return 'todate' | endif
+
+      let cmd = g:shellesc_cd(vcs_update[type])
+
+    let initial_sha = ''
+
     else
       let cmd = vcs_checkout[type]
+    let initial_sha = ''
     endif
   else
-    " how did we get here?
     echo type . " repository is not supported"
     return
   endif
 
-  if s:iswindows()
-    let cmd = substitute(cmd, '^cd ','cd /d ','')  " add /d switch to change drives
-    " let cmd = '"'.cmd.'"'                          " enclose in quotes
-  endif
-
   let out = s:system(cmd)
-
-  let outlist = split(out,"\n",1)
-
   call s:log('')
   call s:log('Bundle '.a:bundle.name_spec)
   call s:log('$ '.cmd)
+  call s:log('> '.out)
 
-  for output in outlist
-    if match(output,'^You') != -1
-      let out = 0
-    endif
-    call s:log('> '.output)
-  endfor
-
-  if (0 != v:shell_error || [out] == [0])
+  if 0 != v:shell_error
     return 'error'
   end
 
-  if out =~# 'up-to-date'
+
+  if out =~# 'up to date'
     return 'todate'
   end
 
+  if empty(initial_sha)
+    return 'new'
+  endif
+
+  let updated_sha = ''
+  call add(g:updated_bundles, [initial_sha, updated_sha, a:bundle])
   return 'updated'
+endf
+
+func! g:shellesc(cmd) abort
+  if (has('win32') || has('win64'))
+    if &shellxquote != '('                           " workaround for patch #445
+      return '"'.a:cmd.'"'                          " enclose in quotes so && joined cmds work
+    endif
+  endif
+  return a:cmd
+endf
+
+func! g:shellesc_cd(cmd) abort
+  if (has('win32') || has('win64'))
+    let cmd = substitute(a:cmd, '^cd ','cd /d ','')  " add /d switch to change drives
+    let cmd = g:shellesc(cmd)
+    return cmd
+  else
+    return a:cmd
+  endif
 endf
 
 func! s:system(cmd) abort
     if exists("*xolox#misc#os#exec")
-        " echom a:cmd
-        let res = get(xolox#misc#os#exec({'command': a:cmd, 'check': 0}),'stdout','')
-        try
-            return join(res,"\n")
-        catch
-            return res
-        endtry
+        return join(get(xolox#misc#os#exec({'command': a:cmd, 'check': 0}),'stdout',[]),'\r')
     else
         return system(a:cmd)
     endif
@@ -344,8 +372,4 @@ func! s:log(str) abort
   let fmt = '%y%m%d %H:%M:%S'
   call add(g:vundle_log, '['.strftime(fmt).'] '.a:str)
   return a:str
-endf
-
-func! s:iswindows() abort
-  return has("win16") || has("win32") || has("win64")
 endf
