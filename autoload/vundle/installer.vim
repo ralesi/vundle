@@ -356,7 +356,11 @@ func! g:shellesc_cd(cmd) abort
 endf
 
 func! s:system(cmd) abort
-  return system(a:cmd)
+  if exists("*xolox#misc#os#exec")
+    return join(get(xolox#misc#os#exec({'command': a:cmd, 'check': 0}),'stdout',[]),'\r')
+  else
+    return system(a:cmd)
+  endif
 endf
 
 func! s:log(str) abort
