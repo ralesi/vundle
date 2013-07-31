@@ -24,11 +24,26 @@ func! vundle#installer#load(...)
         \ g:bundles :
         \ map(new_bundle, 'vundle#config#bundle(v:val, {})')
 
+  " check for load rc configs
+  for v in bundles
+      call vundle#installer#rc(v.name)
+  endfor
+
   call vundle#config#require(bundles)
 
   " apply newly loaded bundles to currently open buffers
   doautoall BufRead
 endf
+
+func! vundle#installer#rc(name)
+  let name = substitute(a:name,'-\|\.','_','g')
+  let name = tolower(name)
+
+  if exists("*rc#".name) && !exists("g:_".name."_loaded")
+      exec "call rc#".name."()"
+      exec "let g:_".name."_loaded=1"
+  endif
+endfunc
 
 func! s:process(bang, cmd)
   let msg = ''
