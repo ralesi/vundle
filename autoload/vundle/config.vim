@@ -1,10 +1,15 @@
 func! vundle#config#bundle(arg, ...)
   let bundle = vundle#config#init_bundle(a:arg, a:000)
-  call s:rtp_rm_a()
-  call add(g:bundles, bundle)
-  call s:rtp_add_a()
-  call vundle#installer#rc(bundle.name)
-  return bundle
+  
+  let names = sort(map(copy(g:bundles), 'v:val.name'))
+  
+  if index(names, bundle.name) == -1
+    call s:rtp_rm_a()
+    call add(g:bundles, bundle)
+    call s:rtp_add_a()
+    call vundle#installer#rc(bundle.name)
+    return bundle
+  endif
 endf
 
 func! vundle#config#init()

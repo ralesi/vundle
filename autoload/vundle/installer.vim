@@ -35,13 +35,19 @@ func! vundle#installer#load(...)
   doautoall BufRead
 endf
 
-func! vundle#installer#rc(name)
+func! vundle#installer#rc(name) abort
   let name = substitute(a:name,'-\|\.','_','g')
   let name = tolower(name)
 
-  if exists("*rc#".name) && !exists("g:_".name."_loaded")
+  " if exists("*rc#".name) && !exists("g:_".name."_loaded")
+  if !exists("g:_".name."_loaded")
+    try
       exec "call rc#".name."()"
+    catch E117
+      " plugin settings are not defined
+    finally
       exec "let g:_".name."_loaded=1"
+    endtry
   endif
 endfunc
 
