@@ -362,7 +362,9 @@ func! g:shellesc_cd(cmd) abort
 endf
 
 func! s:system(cmd) abort
-  if exists("*xolox#misc#os#exec")
+  if exists("*vimproc#system")
+    return vimproc#system(a:cmd)
+  else if exists("*xolox#misc#os#exec")
     return join(get(xolox#misc#os#exec({'command': a:cmd, 'check': 0}),'stdout',[]),'\r')
   else
     return system(a:cmd)
