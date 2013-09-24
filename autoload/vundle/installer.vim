@@ -362,13 +362,17 @@ func! g:shellesc_cd(cmd) abort
 endf
 
 func! s:system(cmd) abort
-  if exists("*vimproc#system")
-    return vimproc#system(a:cmd)
-  else if exists("*xolox#misc#os#exec")
-    return join(get(xolox#misc#os#exec({'command': a:cmd, 'check': 0}),'stdout',[]),'\r')
-  else
-    return system(a:cmd)
+  if (has('win32') || has('win64'))
+    if exists("*vimproc#cmd#system")
+      let g:vundle_exec='vimproc'
+      return vimproc#system(a:cmd)
+    elseif exists("*xolox#misc#os#exec")
+      let g:vundle_exec='xolox'
+      return join(get(xolox#misc#os#exec({'command': a:cmd, 'check': 0}),'stdout',[]),'\r')
+    endif
   endif
+  let g:vundle_exec='system'
+  return system(a:cmd)
 endf
 
 func! s:log(str) abort
