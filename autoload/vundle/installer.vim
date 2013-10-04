@@ -26,6 +26,7 @@ func! vundle#installer#load(...)
 
   " check for load rc configs
   for v in bundles
+      call xolox#misc#msg#debug('Attempting to run name %s for bundle contents %s', v.name, v)
       call vundle#installer#rc(v.name)
   endfor
 
@@ -236,7 +237,9 @@ func! vundle#installer#delete(bang, dir_name) abort
   call s:log('$ '.cmd)
   call s:log('> '.out)
 
-  if 0 != v:shell_error
+  echo s:shell_error
+
+  if 0 != s:shell_error
     return 'error'
   else
     return 'deleted'
@@ -323,7 +326,7 @@ func! s:sync(bang, bundle) abort
   call s:log('$ '.cmd)
   call s:log('> '.out)
 
-  if 0 != v:shell_error
+  if 0 != s:shell_error
     return 'error'
   end
 
@@ -365,14 +368,19 @@ func! s:system(cmd) abort
   if (has('win32') || has('win64'))
     if exists("*vimproc#cmd#system")
       let g:vundle_exec='vimproc'
-      return vimproc#system(a:cmd)
-    elseif exists("*xolox#misc#os#exec")
-      let g:vundle_exec='xolox'
-      return join(get(xolox#misc#os#exec({'command': a:cmd, 'check': 0}),'stdout',[]),'\r')
+    return vimproc#system(a:cmd)
+  elseif exists("*xolox#misc#os#exec")
+    let output=xolox#misc#os#exec({'command': a:cmd, 'async':0, 'check': 0})
+    let out=(len(output.stderr)!=0) ? output.stderr : output.stdout
+    let s:shell_error=(len(output.stderr)!=0) ? -1 : 0
+    " return join(get(xolox#misc#os#exec({'command': a:cmd, 'check': 0}),'stdout',[]),'\r')
+    return join(out,'\r')
     endif
   endif
   let g:vundle_exec='system'
-  return system(a:cmd)
+    let out=system(a:cmd)
+    let s:shell_error=v:shell_error
+    return out
 endf
 
 func! s:log(str) abort
