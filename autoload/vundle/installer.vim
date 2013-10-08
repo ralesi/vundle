@@ -26,8 +26,10 @@ func! vundle#installer#load(...)
 
   " check for load rc configs
   for v in bundles
+    if type(v) == type({})
       call xolox#misc#msg#debug('Attempting to run name %s for bundle contents %s', v.name, v)
       call vundle#installer#rc(v.name)
+    endif
   endfor
 
   call vundle#config#require(bundles)
@@ -286,7 +288,7 @@ func! s:sync(bang, bundle) abort
   let uri = shellescape(a:bundle.uri)
 
   let vcs_update = {
-        \'git': 'cd '.dir.' && git pull && git submodule update --init --recursive',
+        \'git': 'cd '.dir.' && git pull && git submodule update --init',
         \'hg':  'hg pull -u -R '.dir,
         \'bzr': 'bzr pull -d '.dir,
         \'svn': 'cd '.dir.' && svn update'}  
