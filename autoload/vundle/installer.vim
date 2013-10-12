@@ -15,9 +15,9 @@ endf
 func! vundle#installer#load(...) 
   " echom join(a:000,'')
   if type(a:000) == type ([]) && a:0 == 1
-      let new_bundle = split(a:000[0],',')
+    let new_bundle = split(a:000[0],',')
   else
-      let new_bundle = copy(a:000)
+    let new_bundle = copy(a:000)
   endif
 
   let bundles = (a:0 == '') ?
@@ -46,10 +46,10 @@ func! vundle#installer#rc(name) abort
   if !exists("g:_".name."_loaded")
     try
       exec "call rc#".name."()"
+      exec "let g:_".name."_loaded=1"
     catch E117
       " plugin settings are not defined
-    finally
-      exec "let g:_".name."_loaded=1"
+      " echom name . " failed to load"
     endtry
   endif
 endfunc
@@ -156,7 +156,7 @@ endf
 func! vundle#installer#docs() abort
   let error_count = vundle#installer#helptags(g:bundles)
   if error_count > 0
-      return 'error'
+    return 'error'
   endif
   return 'helptags'
 endf
@@ -186,8 +186,8 @@ endf
 func! vundle#installer#unloaded() abort
   let bundle_dirs = map(copy(g:bundles), 'v:val.path()') 
   let all_dirs = (v:version > 702 || (v:version == 702 && has("patch51")))
-  \   ? split(globpath(g:bundle_dir, '*', 1), "\n")
-  \   : split(globpath(g:bundle_dir, '*'), "\n")
+        \   ? split(globpath(g:bundle_dir, '*', 1), "\n")
+        \   : split(globpath(g:bundle_dir, '*'), "\n")
   let x_dirs = filter(all_dirs, '0 > index(bundle_dirs, v:val)')
   return map(copy(x_dirs), 'fnamemodify(v:val, ":t")')
 endfunc
@@ -226,8 +226,8 @@ endf
 func! vundle#installer#delete(bang, dir_name) abort
 
   let cmd = (has('win32') || has('win64')) ?
-  \           'rmdir /S /Q' :
-  \           'rm -rf'
+        \           'rmdir /S /Q' :
+        \           'rm -rf'
 
   let bundle = vundle#config#init_bundle(a:dir_name, {})
   let cmd .= ' '.shellescape(bundle.path())
@@ -250,10 +250,10 @@ endf
 
 func! s:has_doc(rtp) abort
   return isdirectory(a:rtp.'/doc')
-  \   && (!filereadable(a:rtp.'/doc/tags') || filewritable(a:rtp.'/doc/tags'))
-  \   && (v:version > 702 || (v:version == 702 && has("patch51")))
-  \     ? !(empty(glob(a:rtp.'/doc/*.txt', 1)) && empty(glob(a:rtp.'/doc/*.??x', 1)))
-  \     : !(empty(glob(a:rtp.'/doc/*.txt')) && empty(glob(a:rtp.'/doc/*.??x')))
+        \   && (!filereadable(a:rtp.'/doc/tags') || filewritable(a:rtp.'/doc/tags'))
+        \   && (v:version > 702 || (v:version == 702 && has("patch51")))
+        \     ? !(empty(glob(a:rtp.'/doc/*.txt', 1)) && empty(glob(a:rtp.'/doc/*.??x', 1)))
+        \     : !(empty(glob(a:rtp.'/doc/*.txt')) && empty(glob(a:rtp.'/doc/*.??x')))
 endf
 
 func! s:helptags(rtp) abort
@@ -368,21 +368,21 @@ endf
 
 func! s:system(cmd) abort
   if (has('win32') || has('win64'))
-    if exists("*vimproc#cmd#system")
+    if exists("*vimproc#system")
       let g:vundle_exec='vimproc'
-    return vimproc#system(a:cmd)
-  elseif exists("*xolox#misc#os#exec")
-    let output=xolox#misc#os#exec({'command': a:cmd, 'async':0, 'check': 0})
-    let out=(len(output.stderr)!=0) ? output.stderr : output.stdout
-    let s:shell_error=(len(output.stderr)!=0) ? -1 : 0
-    " return join(get(xolox#misc#os#exec({'command': a:cmd, 'check': 0}),'stdout',[]),'\r')
-    return join(out,'\r')
+      return vimproc#cmd#system(a:cmd)
+    elseif exists("*xolox#misc#os#exec")
+      let output=xolox#misc#os#exec({'command': a:cmd, 'async':0, 'check': 0})
+      let out=(len(output.stderr)!=0) ? output.stderr : output.stdout
+      let s:shell_error=(len(output.stderr)!=0) ? -1 : 0
+      " return join(get(xolox#misc#os#exec({'command': a:cmd, 'check': 0}),'stdout',[]),'\r')
+      return join(out,'\r')
     endif
   endif
   let g:vundle_exec='system'
-    let out=system(a:cmd)
-    let s:shell_error=v:shell_error
-    return out
+  let out=system(a:cmd)
+  let s:shell_error=v:shell_error
+  return out
 endf
 
 func! s:log(str) abort
