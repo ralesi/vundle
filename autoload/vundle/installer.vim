@@ -368,15 +368,17 @@ endf
 
 func! s:system(cmd) abort
   if (has('win32') || has('win64'))
-    if exists("*vimproc#system")
-      let g:vundle_exec='vimproc'
-      return vimproc#cmd#system(a:cmd)
-    elseif exists("*xolox#misc#os#exec")
+    if exists("*xolox#misc#os#exec")
       let output=xolox#misc#os#exec({'command': a:cmd, 'async':0, 'check': 0})
       let out=(len(output.stderr)!=0) ? output.stderr : output.stdout
       let s:shell_error=(len(output.stderr)!=0) ? -1 : 0
       " return join(get(xolox#misc#os#exec({'command': a:cmd, 'check': 0}),'stdout',[]),'\r')
       return join(out,'\r')
+    elseif exists("*vimproc#system")
+      let g:vundle_exec='vimproc'
+      let out=vimproc#cmd#system(a:cmd)
+      let s:shell_error=vimproc#get_last_errmsg()
+      return out
     endif
   endif
   let g:vundle_exec='system'
