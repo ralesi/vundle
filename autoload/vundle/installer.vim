@@ -284,23 +284,30 @@ func! s:sync(bang, bundle) abort
     let repo_dir = expand(a:bundle.path().'/.'.a:bundle.type.'/',1)
   endif
 
-  let dir = shellescape(a:bundle.path())
-  let uri = shellescape(a:bundle.uri)
+  let git_dir = escape(repo_dir,'\/\\')
+  let dir = escape(shellescape(a:bundle.path()),'\/\\')
+  " let uri = escape(shellescape(a:bundle.uri),'\/\\')
+  let uri = a:bundle.uri
+
+  " echom git_dir
+
+  let work_tree = '--git-dir="'.escape(repo_dir,'"\/\\').'" --work-tree='.dir
+
 
   let vcs_update = {
-        \'git': 'cd '.dir.' && git pull && git submodule update --init',
+        \'git': 'git '.work_tree.' pull && git '.work_tree.' submodule update --init',
         \'hg':  'hg pull -u -R '.dir,
         \'bzr': 'bzr pull -d '.dir,
         \'svn': 'cd '.dir.' && svn update'}  
 
   let vcs_sha = {
-        \'git': 'cd '.dir.' && git rev-parse HEAD',
+        \'git': 'git '.work_tree.' rev-parse HEAD',
         \'hg': '',
         \'bzr': '',
         \'svn': ''}  
 
   let vcs_checkout = {
-        \'git':  'git clone --recursive '.uri.' '.dir.'',
+        \'git':  'git clone '.uri.' '.dir.'',
         \'hg':   'hg clone '.uri.' '.dir.'',
         \'bzr':  'bzr branch '.uri.' '.dir.'',
         \'svn':  ''}
@@ -321,6 +328,8 @@ func! s:sync(bang, bundle) abort
     echo type . " repository is not supported"
     return
   endif
+
+  echo printf("%s: %s ==> %.60s... (%.10s)", a:bundle.type, a:bundle.name, cmd, initial_sha)
 
   let out = s:system(cmd)
   call s:log('')
@@ -368,17 +377,22 @@ endf
 
 func! s:system(cmd) abort
   if (has('win32') || has('win64'))
+    if exists("*vimproc#system")
+      let g:vundle_exec='vimproc'
+      let out=vimproc#system(a:cmd,'',10000)
+      let s:shell_error=vimproc#get_last_errmsg()
+      if !empty(out)
+        return out
+      endif
+    endif 
     if exists("*xolox#misc#os#exec")
       let output=xolox#misc#os#exec({'command': a:cmd, 'async':0, 'check': 0})
       let out=(len(output.stderr)!=0) ? output.stderr : output.stdout
       let s:shell_error=(len(output.stderr)!=0) ? -1 : 0
       " return join(get(xolox#misc#os#exec({'command': a:cmd, 'check': 0}),'stdout',[]),'\r')
-      return join(out,'\r')
-    elseif exists("*vimproc#system")
-      let g:vundle_exec='vimproc'
-      let out=vimproc#cmd#system(a:cmd)
-      let s:shell_error=vimproc#get_last_errmsg()
-      return out
+      if !empty(out)
+        return out
+      endif
     endif
   endif
   let g:vundle_exec='system'
